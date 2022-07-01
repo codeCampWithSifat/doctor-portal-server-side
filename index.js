@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express()
 const cors = require('cors');
-const port =  5000 ;
+const port = process.env.PORT || 5000 ;
 
 
 // use the middleware
@@ -12,7 +12,7 @@ app.use(cors());
 
 app.get('/' ,(req,res) => {
     res.send('Hello Developer Sifat');
-    console.log('Everything is ok')
+    console.log('Everything is ok all fine ')
 });
 
 
