@@ -17,7 +17,11 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 async function run () {
     try {
         await client.connect();
-        console.log('database connected successfully')
+        console.log('database connected successfully');
+        const database = client.db('doctors_portal');
+        const appoinmentsCollection = database.collection("appoinments");
+
+        // 
 
     } finally {
         // await client.close()
@@ -28,7 +32,7 @@ run().catch(console.dir)
 
 
 app.get('/' ,(req,res) => {
-    res.send('Hello Developer Sifat');
+    res.send('Hello Doctors Portal');
     console.log('Everything is ok all fine in the server ')
 });
 
