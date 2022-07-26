@@ -3,7 +3,15 @@ const app = express();
 const cors = require("cors");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 require("dotenv").config();
+const admin = require("firebase-admin");
 const port = process.env.PORT || 5000;
+
+// doctors portal server side
+const serviceAccount = require("./fir-again-2-firebase-adminsdk-ds86y-d95e4285c0.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 // use the middleware
 app.use(express.json());
@@ -15,6 +23,18 @@ const client = new MongoClient(uri, {
   useUnifiedTopology: true,
   serverApi: ServerApiVersion.v1,
 });
+
+async function verifyToken(req, res, next) {
+  if (req.headers?.authorization?.startsWith("Bearer ")) {
+    const token = req.headers.authorization.split(" ")[1];
+
+    try {
+      const decodedUser = await admin.auth().verifyIdToken(token);
+      req.decodedEmail = decodedUser.email;
+    } catch {}
+  }
+  next();
+}
 
 async function run() {
   try {
@@ -29,7 +49,7 @@ async function run() {
       const appoinment = req.body;
       const result = await appoinmentsCollection.insertOne(appoinment);
       res.json(result);
-    //   console.log(result);
+      //   console.log(result);
     });
 
     app.get("/appoinments", async (req, res) => {
@@ -46,41 +66,53 @@ async function run() {
     app.post("/users", async (req, res) => {
       const user = req.body;
       const result = await usersCollection.insertOne(user);
-    //   console.log(result);
+      //   console.log(result);
       res.json(result);
     });
 
-    app.put('/users',async(req,res) => {
-        const user = req.body ;
-        const filter = {email : user.email};
-        const options = {upsert : true};
-        const updateDoc = {$set: user};
-        const result = await usersCollection.updateOne(filter, updateDoc, options);
-        res.json(result);
+    app.put("/users", async (req, res) => {
+      const user = req.body;
+      const filter = { email: user.email };
+      const options = { upsert: true };
+      const updateDoc = { $set: user };
+      const result = await usersCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      res.json(result);
     });
 
     // set admin for the website
-    app.put('/users/admin', async(req,res) => {
-        const user = req.body ;
-        console.log("put admin user",user)
-        const filter = {email : user.email};
-        const updateDoc = {$set : {role: "admin"}};
-        const result = await usersCollection.updateOne(filter, updateDoc);
-        res.json(result)
-    })
-
-    // get an admin 
-    app.get('/users/:email', async(req,res) => {
-        const email = req.params.email ;
-        const query = {email : email};
-        const user = await usersCollection.findOne(query);
-        let isAdmin = false ;
-        if(user?.role === "admin") {
-            isAdmin = true
+    app.put("/users/admin", verifyToken, async (req, res) => {
+      const user = req.body;
+      // console.log("put admin user",req.decodedEmail)
+      const requester = req.decodedEmail;
+      if (requester) {
+        const requesterAccount = await usersCollection.findOne({email: requester,});
+        if (requesterAccount.role === "admin") {
+          const filter = { email: user.email };
+          const updateDoc = { $set: { role: "admin" } };
+          const result = await usersCollection.updateOne(filter, updateDoc);
+          res.json(result);
         }
-        res.json({admin : isAdmin})
-    })
+      } else {
+        res.status(403).json({message : "You Do Not Any Access To Make Any Admin"})
+      }
 
+    });
+
+    // get an admin
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let isAdmin = false;
+      if (user?.role === "admin") {
+        isAdmin = true;
+      }
+      res.json({ admin: isAdmin });
+    });
   } finally {
     // await client.close()
   }
